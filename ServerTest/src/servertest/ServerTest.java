@@ -102,6 +102,28 @@ public class ServerTest extends JFrame {
         
         System.out.println("fin execute");
     } // end method execute
+    
+        public void execute(Socket A, Socket B) {
+       
+        players[0] = new Player(A,0);
+        runGame.execute(players[0]);
+        players[1] = new Player(B,1);
+        runGame.execute(players[1]);
+     
+    
+        gameLock.lock(); // lock game to signal player X's thread
+
+ 
+       try {
+            players[PLAYER_X].setSuspended(false); // resume player X
+            otherPlayerConnected.signal(); // wake up player X's thread
+        } // end try
+        finally {
+            gameLock.unlock(); // unlock game after signalling player X
+        } // end finally
+        
+        System.out.println("fin execute 2");
+    } // end method execute
 
     // display message in outputArea
     private void displayMessage(final String messageToDisplay) {
