@@ -1,12 +1,8 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package servertest;
 
-// This class maintains a game of Tic-Tac-Toe for two clients.
 import java.awt.BorderLayout;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.io.IOException;
@@ -36,6 +32,11 @@ public class ServerTest extends JFrame {
     private Lock gameLock; // to lock game for synchronization
     private Condition otherPlayerConnected; // to wait for other player
     private Condition otherPlayerTurn; // to wait for other player's turn
+    
+    
+   
+    
+    
 // set up tic-tac-toe server and GUI that displays messages
 
     public ServerTest() {
@@ -48,7 +49,7 @@ public class ServerTest extends JFrame {
 // condition variable for the other player's turn
         otherPlayerTurn = gameLock.newCondition();
         for (int i = 0; i < 9; i++) {
-            board[i] = new String(" "); // create tic-tac-toe board
+            board[i] = new String(""); // create tic-tac-toe board
         }
         players = new Player[2]; // create array of players
         currentPlayer = PLAYER_X; // set current player to first player
@@ -74,11 +75,12 @@ public class ServerTest extends JFrame {
     // wait for two connections so game can be played
     public void execute() {
         // wait for each client to connect
-        for (int i = 0; i < players.length; i++) {
+        for (int i = 0; i <= 1; i++) {
             try // wait for connection, create Player, start runnable
             {
                 players[i] = new Player(server.accept(), i);
                 runGame.execute(players[i]); // execute player runnable
+                System.out.println("i: "+i);
             } // end try
             catch (IOException ioException) {
                 ioException.printStackTrace();
@@ -86,15 +88,19 @@ public class ServerTest extends JFrame {
             } // end catch
         } // end for
 
+        System.out.println("salio del for");
         gameLock.lock(); // lock game to signal player X's thread
 
-        try {
+ 
+       try {
             players[PLAYER_X].setSuspended(false); // resume player X
             otherPlayerConnected.signal(); // wake up player X's thread
         } // end try
         finally {
             gameLock.unlock(); // unlock game after signalling player X
         } // end finally
+        
+        System.out.println("fin execute");
     } // end method execute
 
     // display message in outputArea
@@ -102,6 +108,7 @@ public class ServerTest extends JFrame {
         // display message from event-dispatch thread of execution
         SwingUtilities.invokeLater(
                 new Runnable() {
+                    @Override
             public void run() // updates outputArea
             {
                 outputArea.append(messageToDisplay); // add message
@@ -171,12 +178,15 @@ public class ServerTest extends JFrame {
     private class Player implements Runnable {
 
         private Socket connection; // connection to client
-        private Scanner input; // input from client
-        private Formatter output; // output to client
+        //private Scanner input; // input from client
+        //private Formatter output; // output to client
         private int playerNumber; // tracks which player this is
         private String mark; // mark for this player
         private boolean suspended = true; // whether thread is suspended
 
+        DataOutputStream out;
+        DataInputStream in;
+        
         // set up Player thread
         public Player(Socket socket, int number) {
             playerNumber = number; // store this player's number
@@ -185,8 +195,12 @@ public class ServerTest extends JFrame {
 
             try // obtain streams from Socket
             {
-                input = new Scanner(connection.getInputStream());
-                output = new Formatter(connection.getOutputStream());
+                
+                 in = new DataInputStream(socket.getInputStream());
+                 out = new DataOutputStream(socket.getOutputStream());
+                
+                //input = new Scanner(connection.getInputStream());
+                //output = new Formatter(connection.getOutputStream());
             } // end try
             catch (IOException ioException) {
                 ioException.printStackTrace();
@@ -196,23 +210,47 @@ public class ServerTest extends JFrame {
 
         // send message that other player moved
         public void otherPlayerMoved(int location) {
-            output.format("Opponent moved");
-            output.format("%d", location); // send location of move
-            output.flush(); // flush output 
+            try{
+                out.writeUTF("Opponent moved");
+                out.writeUTF(""+location);
+                out.flush();
+            }catch(IOException e){
+                System.out.println("Error en otherPlayerMover");
+            }
+            //output.format("Opponent moved");
+            //output.format("%d", location); // send location of move
+            //output.flush(); // flush output 
         } // end method otherPlayerMoved
 
         // control thread's execution
+        @Override
         public void run() {
             // send client its mark (X or O), process messages from client
             try {
                 displayMessage("Player " + mark + " connected");
-                output.format("%s", mark); // send player's mark
-                output.flush(); // flush output 
+                
+                try{
+                    out.writeUTF(""+mark);
+                    out.flush();
+                }catch(IOException e){
+                    System.out.println("Error en run 1");
+                }
+                //output.format("%s", mark); // send player's mark
+                //output.flush(); // flush output 
 
                 // if player X, wait for another player to arrive
                 if (playerNumber == PLAYER_X) {
-                    output.format("%s%s", "Player X connected", "Waiting for another player");
-                    output.flush(); // flush output 
+                    
+                    
+                     try{
+                        out.writeUTF("Player X connected " + "Waiting for another player");
+                        out.flush();
+                     }catch(IOException e){
+                        System.out.println("Error en run 1");
+                     }
+                    
+                   // output.format("%s%s", "Player X connected", "Waiting for another player");
+                    //output.flush(); // flush output 
 
                     gameLock.lock(); // lock game to wait for second player
 
@@ -229,31 +267,72 @@ public class ServerTest extends JFrame {
                     } // end finally
 
                     // send message that other player connected
-                    output.format("Other player connected. Your move.");
-                    output.flush(); // flush output 
+                    
+                     try{
+                        out.writeUTF("Other player connected. Your move.");
+                        out.flush();
+                     }catch(IOException e){
+                        System.out.println("Error en run 2");
+                     }
+                    
+                    //output.format("Other player connected. Your move.");
+                    //output.flush(); // flush output 
                 } // end if
                 else {
-                    output.format("Player O connected, please wait");
-                    output.flush(); // flush output 
+                    
+                     try{
+                        out.writeUTF("Player O connected, please wait");
+                        out.flush();
+                     }catch(IOException e){
+                        System.out.println("Error en run 3");
+                     }
+                    
+                    
+                    //output.format("Player O connected, please wait");
+                    //output.flush(); // flush output 
                 } // end else
 
                 // while game not over
                 while (!isGameOver()) {
                     int location = 0; // initialize move location
 
-                    if (input.hasNext()) {
-                        location = input.nextInt(); // get move location
+                    
+                    try{
+                        location = Integer.parseInt(in.readUTF());
+                    }catch(IOException e){
+                         System.out.println("Error en run Lectura de datos location ");
                     }
+                    /*if (input.hasNext()) {
+                        location = input.nextInt(); // get move location
+                    }*/
                     // check for valid move
                     if (validateAndMove(location, playerNumber)) {
                         displayMessage("location: " + location);
-                        output.format("Valid move."); // notify client
-                        output.flush(); // flush output 
+                        
+                        try{
+                            out.writeUTF("Valid move.");
+                            out.flush();
+                        }catch(IOException e){
+                            System.out.println("Error en run 4");
+                        }
+                        
+                        
+                        //output.format("Valid move."); // notify client
+                        //output.flush(); // flush output 
                     } // end if
                     else // move was invalid
                     {
-                        output.format("Invalid move, try again");
-                        output.flush(); // flush output 
+                        
+                          try{
+                            out.writeUTF("Invalid move, try again");
+                            out.flush();
+                          }catch(IOException e){
+                            System.out.println("Error en run 5");
+                          }
+                        
+                        
+                        //output.format("Invalid move, try again");
+                        //output.flush(); // flush output 
                     } // end else
                 } // end while
             } // end try

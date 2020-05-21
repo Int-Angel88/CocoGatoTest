@@ -11,6 +11,8 @@ import java.awt.Graphics;
 import java.awt.GridLayout;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.net.Socket;
 import java.net.InetAddress;
 import java.io.IOException;
@@ -34,14 +36,18 @@ public class ClientTest extends JFrame implements Runnable {
     private Square board[][]; // tic-tac-toe board
     private Square currentSquare; // current square
     private Socket connection; // connection to server
-    private Scanner input; // input from server
-    private Formatter output; // output to server
+    //private Scanner input; // input from server
+    //private Formatter output; // output to server
     private String ticTacToeHost; // host name for server
     private String myMark; // this client's mark
     private boolean myTurn; // determines which client's turn it is
     private final String X_MARK = "X"; // mark for first client
     private final String O_MARK = "O"; // mark for second client
 
+    
+    DataOutputStream out;
+    DataInputStream in;
+    
     // set up user-interface and board
     public ClientTest(String host) {
         ticTacToeHost = host; // set name of server
@@ -86,8 +92,12 @@ public class ClientTest extends JFrame implements Runnable {
             connection = new Socket(InetAddress.getByName(ticTacToeHost), 471);
 
             // get streams for input and output
-            input = new Scanner(connection.getInputStream());
-            output = new Formatter(connection.getOutputStream());
+            
+            in = new DataInputStream(connection.getInputStream());
+            out = new DataOutputStream(connection.getOutputStream());
+            
+            //input = new Scanner(connection.getInputStream());
+            //output = new Formatter(connection.getOutputStream());
         } // end try
         catch (IOException ioException) {
             ioException.printStackTrace();
@@ -99,11 +109,20 @@ public class ClientTest extends JFrame implements Runnable {
     } // end method startClient
 
     // control thread that allows continuous update of displayArea
+    @Override
     public void run() {
-        myMark = input.nextLine(); // get player's mark (X or O)
+        
+        try{
+            myMark = in.readUTF();
+        }catch(IOException e){
+            System.out.println("Error al leer el mark");
+        }
+        
+        //myMark = input.nextLine(); // get player's mark (X or O)
 
         SwingUtilities.invokeLater(
                 new Runnable() {
+                    @Override
             public void run() {
                 // display player's mark
                 idField.setText("You are player" + myMark + "" );
@@ -115,8 +134,13 @@ public class ClientTest extends JFrame implements Runnable {
 
         // receive messages sent to client and output them
         while (true) {
-            if (input.hasNextLine()) {
+            /*if (input.hasNextLine()) {
                 processMessage(input.nextLine());
+            }*/
+            try{
+                processMessage(in.readUTF());
+            }catch(IOException e){
+                System.out.println("Error al leer mensaje processMessage");
             }
         } // end while
     } // end method run
@@ -133,8 +157,17 @@ public class ClientTest extends JFrame implements Runnable {
             myTurn = true; // still this client's turn
         } // end else if
         else if (message.equals("Opponent moved")) {
-            int location = input.nextInt(); // get move location
-            input.nextLine(); // skip newline after int location
+            int location = 0;
+             try{
+                 location = Integer.parseInt(in.readUTF());
+                 //input.nextLine();
+                
+             }catch(IOException e){
+                 System.out.println("Error al leer location");
+             }
+
+            //int location = input.nextInt(); // get move location
+            //input.nextLine(); // skip newline after int location
             int row = location / 3; // calculate row
             int column = location % 3; // calculate column
 
@@ -152,6 +185,7 @@ public class ClientTest extends JFrame implements Runnable {
     private void displayMessage(final String messageToDisplay) {
         SwingUtilities.invokeLater(
                 new Runnable() {
+                    @Override
             public void run() {
                 displayArea.append(messageToDisplay); // updates output
             } // end method run
@@ -163,6 +197,7 @@ public class ClientTest extends JFrame implements Runnable {
     private void setMark(final Square squareToMark, final String mark) {
         SwingUtilities.invokeLater(
                 new Runnable() {
+                    @Override
             public void run() {
                 squareToMark.setMark(mark); // set mark in square
             } // end method run
@@ -174,8 +209,16 @@ public class ClientTest extends JFrame implements Runnable {
     public void sendClickedSquare(int location) {
         // if it is my turn
         if (myTurn) {
-            output.format("%d", location); // send location to server
-            output.flush();
+            
+            try{
+                out.writeUTF(""+location);
+                out.flush();
+            }catch(IOException e){
+                System.out.println("Error al mandar location sendClickedSquare");
+            }
+            
+            //output.format("%d", location); // send location to server
+            //output.flush();
             myTurn = false; // not my turn anymore
         } // end if
     } // end method sendClickedSquare
